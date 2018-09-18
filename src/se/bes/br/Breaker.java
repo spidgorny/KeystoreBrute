@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class Breaker {
     private final char[] mPossibles;
@@ -28,6 +29,7 @@ public class Breaker {
      */
     private static class Shutdown extends Thread {
         private boolean keepOn = true;
+
         @Override
         public void run() {
             // Just print a newline to save the last line.
@@ -43,21 +45,18 @@ public class Breaker {
     /**
      * Sets up and initiates all the threads needed to break the given keystore.
      *
-     * @param fileName
-     *            The path and filename of the {@link KeyStore} you wish to
-     *            break.
-     * @param startDepth
-     *            The number of characters to start trying at. A keystore
-     *            requires 6 characters so that is probably a minimum, but any
-     *            value is acceptable.
-     * @param threads
-     *            The number of {@link Thread}s you wish to have simultaneously
-     *            running, breaking passwords. Experiment to find the optimal
-     *            value for your setup.
+     * @param fileName   The path and filename of the {@link KeyStore} you wish to
+     *                   break.
+     * @param startDepth The number of characters to start trying at. A keystore
+     *                   requires 6 characters so that is probably a minimum, but any
+     *                   value is acceptable.
+     * @param threads    The number of {@link Thread}s you wish to have simultaneously
+     *                   running, breaking passwords. Experiment to find the optimal
+     *                   value for your setup.
      */
     public Breaker(String fileName, int startDepth, int threads) {
         mGenerator = new PasswordGenerator(startDepth - 1);
-        mGenerator.setPriority(Thread.NORM_PRIORITY+1);
+        mGenerator.setPriority(Thread.NORM_PRIORITY + 1);
 
         // Create list of possible characters
         // If needed, add or remove characters here
@@ -97,6 +96,7 @@ public class Breaker {
      * found, at which point it will return the password as a {@link String}.
      * <br/>
      * May take a <b>VERY</b> long time.
+     *
      * @return A {@link String} with the password used to open the given {@link KeyStore}
      */
     public String getPassphrase() throws InterruptedException {
@@ -122,9 +122,9 @@ public class Breaker {
 
             long totalTime = (System.currentTimeMillis() - totalStartTime) / 1000;
 
-            System.out.print("Tested " + mCounter
+            System.out.println("Tested " + mCounter
                     + " pws (" + totalTime + " s -- " + rate + " pw/s): "
-                    + new String(globalPass) + "       \r");
+                    + new String(globalPass));
         }
 
         return new String(mFoundPassword);
@@ -146,7 +146,7 @@ public class Breaker {
 
                 FileInputStream fis = new FileInputStream(file);
 
-                byte[] fileBytes = new byte[(int)file.length()];
+                byte[] fileBytes = new byte[(int) file.length()];
 
                 fis.read(fileBytes);
 
@@ -162,6 +162,7 @@ public class Breaker {
          */
         @Override
         public void run() {
+            mGenerator.init();
             KeyStore ks = null;
             try {
                 ks = KeyStore.getInstance(KeyStore.getDefaultType());
@@ -169,7 +170,7 @@ public class Breaker {
                 e.printStackTrace();
             }
             char[] passwd = null;
-            while(!mIsFound) {
+            while (!mIsFound) {
                 //System.out.println("Next pw");
                 mStream.reset();
                 try {
@@ -193,6 +194,22 @@ public class Breaker {
             this.mDepth = depth;
         }
 
+        public void init() {
+            String default1 = "abcaaa";
+            System.out.println(default1);
+            System.out.println(Arrays.toString(default1.toCharArray()));
+            this.counts = new int[default1.length()];
+            String sPossibles = new String(mPossibles);
+            int i = 0;
+            for (char c : default1.toCharArray()) {
+                int pos = sPossibles.indexOf(c);
+                System.out.println(c + '=' + pos);
+                this.counts[i] = pos;
+            }
+            System.out.println(Arrays.toString(this.counts));
+            mDepth = default1.length();
+        }
+
         /**
          * Used by the password testing threads to pop a password from the
          * head of the list.
@@ -213,7 +230,7 @@ public class Breaker {
             char[] passwd = countsToChars(localCounts);
             mCounter++;
 
-            if (mCounter % 100000 == 0) {
+            if (mCounter % 10000 == 0) {
                 globalPass = passwd;
             }
             return passwd;
@@ -221,12 +238,12 @@ public class Breaker {
 
         /**
          * Takes the state of counts, reverses it and puts it into out.
-         *
+         * <p>
          * If it were not reversed, passwords would be generated head-first,
          * now they are generated tail-first. Decide which way YOU want to go =)
          *
          * @param counts The state as related to {@link Breaker#mPossibles}
-         * @param out The translated character from counts will be placed here.
+         * @param out    The translated character from counts will be placed here.
          */
         private boolean getIterationChars(int[] counts) {
             int idx = 0;
@@ -238,13 +255,13 @@ public class Breaker {
                     counts[idx]++;
                 }
             }
-            return counts[counts.length - 1] == mPossibles.length-1;
+            return counts[counts.length - 1] == mPossibles.length - 1;
         }
 
         private char[] countsToChars(int[] counts) {
             char[] out = new char[counts.length];
             for (int i = 0; i < counts.length; i++) {
-                out[counts.length-1-i] = mPossibles[counts[i]];
+                out[counts.length - 1 - i] = mPossibles[counts[i]];
             }
             return out;
         }
