@@ -7,6 +7,7 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 
 public class Breaker {
     private final char[] mPossibles;
@@ -81,6 +82,7 @@ public class Breaker {
             mPossibles[i] = possibleList.get(i).charValue();
             System.out.print(mPossibles[i]);
         }
+        System.out.println();
 
         mGenerator.start();
 
@@ -108,7 +110,7 @@ public class Breaker {
             long startTime = System.currentTimeMillis();
             long startCount = mCounter;
             try {
-                Thread.sleep(500);
+                Thread.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -175,10 +177,15 @@ public class Breaker {
                 mStream.reset();
                 try {
                     passwd = mGenerator.getNextPassword();
+//                    System.out.println(passwd);
+                    if (new String(passwd) == "abc123") {
+                        System.out.println("is abc123");
+                    }
                     ks.load(mStream, passwd);
                 } catch (Throwable t) {
                     continue;
                 }
+                System.out.println("Done searching "+new String(passwd));
                 mFoundPassword = passwd;
                 mIsFound = true;
             }
@@ -200,14 +207,17 @@ public class Breaker {
             System.out.println(Arrays.toString(default1.toCharArray()));
             this.counts = new int[default1.length()];
             String sPossibles = new String(mPossibles);
-            int i = 0;
-            for (char c : default1.toCharArray()) {
+            int i = default1.length()-1;
+            char[] reverseMe = default1.toCharArray();
+//            Collections.reverse(Arrays.asList(reverseMe));
+            for (char c : reverseMe) {
                 int pos = sPossibles.indexOf(c);
-                System.out.println(c + '=' + pos);
-                this.counts[i] = pos;
+                System.out.println(c + "=" + pos);
+                this.counts[i--] = pos;
             }
             System.out.println(Arrays.toString(this.counts));
             mDepth = default1.length();
+            lastIteration = false;
         }
 
         /**
@@ -215,24 +225,22 @@ public class Breaker {
          * head of the list.
          */
         public char[] getNextPassword() {
-            int[] localCounts = null;
             synchronized (PASS_LOCK) {
                 if (lastIteration) {
                     mDepth++;
-                    counts = new int[mDepth];
+                    if (mDepth < counts.length) {
+                        counts = new int[mDepth];
+                    }
                     counts[0] = -1; // Make sure first iteration starts at correct character
                     System.out.println();
                     System.out.println("Starting search for depth: " + mDepth);
                 }
                 lastIteration = getIterationChars(counts);
-                localCounts = counts.clone();
             }
-            char[] passwd = countsToChars(localCounts);
+            char[] passwd = countsToChars(counts);
             mCounter++;
 
-            if (mCounter % 10000 == 0) {
-                globalPass = passwd;
-            }
+            globalPass = passwd;
             return passwd;
         }
 
@@ -243,7 +251,6 @@ public class Breaker {
          * now they are generated tail-first. Decide which way YOU want to go =)
          *
          * @param counts The state as related to {@link Breaker#mPossibles}
-         * @param out    The translated character from counts will be placed here.
          */
         private boolean getIterationChars(int[] counts) {
             int idx = 0;
